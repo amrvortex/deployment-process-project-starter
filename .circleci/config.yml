@@ -1,78 +1,162 @@
 version: 2.1
+
 orbs:
-  # orgs contain basc recipes and reproducible actions (install node, aws, etc.)
-  node: circleci/node@5.0.2
-  eb: circleci/aws-elastic-beanstalk@2.0.1
   aws-cli: circleci/aws-cli@3.1.1
-  # different jobs are calles later in the workflows sections
+  node: circleci/node@5.0.2
+
 jobs:
   build:
     docker:
-      # the base image can run most needed actions with orbs
-      - image: "cimg/node:14.15"
+      - image: cimg/node:20.0  # MUST match your EB: Node.js 20
     steps:
-      # install node and checkout code
-      - node/install:
-          node-version: '14.15'         
       - checkout
-      # Use root level package.json to install dependencies in the frontend app
+      
+      # Update package.json Node.js version if needed (optional)
       - run:
-          name: Install Front-End Dependencies
+          name: Update Node.js version in package.json
           command: |
-            echo "NODE --version" 
-            echo $(node --version)
-            echo "NPM --version" 
-            echo $(npm --version)
-            npm run frontend:install
-      # TODO: Install dependencies in the the backend API          
+            cd udagram-api
+            # Update engines field to Node.js 20
+            sed -i 's/"node": "14\.15\.0"/"node": "20.x"/' package.json
+            echo "Updated package.json Node.js version to 20.x"
+      
+      # Install backend dependencies
       - run:
-          name: Install API Dependencies
+          name: Install Backend Dependencies
           command: |
-           echo "TODO: Install dependencies in the the backend API  "
-      # TODO: Lint the frontend
+            cd udagram-api
+            npm install
+      
+      # Install frontend dependencies
       - run:
-          name: Front-End Lint
+          name: Install Frontend Dependencies
           command: |
-            echo "TODO: Lint the frontend"
-      # TODO: Build the frontend app
+            cd udagram-frontend
+            npm install
+      
+      # Build backend
       - run:
-          name: Front-End Build
+          name: Build Backend
           command: |
-            echo "TODO: Build the frontend app"
-      # TODO: Build the backend API      
+            cd udagram-api
+            npm run build
+      
+      # Build frontend
       - run:
-          name: API Build
+          name: Build Frontend
           command: |
-            echo "TODO: Build the backend API"
-  # deploy step will run only after manual approval
+            cd udagram-frontend
+            npm run build
+      
+      # Verify builds
+      - run:
+          name: Verify Builds
+          command: |
+            echo "Backend build:"
+            ls -la udagram-api/www/
+            echo ""
+            echo "Frontend build:"
+            ls -la udagram-frontend/www/
+
   deploy:
     docker:
-      - image: "cimg/base:stable"
-      # more setup needed for aws, node, elastic beanstalk
+      - image: cimg/node:20.0  # MUST match your EB: Node.js 20
     steps:
-      - node/install:
-          node-version: '14.15' 
-      - eb/setup
-      - aws-cli/setup
       - checkout
+      
+      # Setup AWS CLI
+      - aws-cli/setup
+      
+      # Update Node.js version in package.json for deployment
       - run:
-          name: Deploy App
-          # TODO: Install, build, deploy in both apps
+          name: Ensure Node.js 20 in package.json
           command: |
-            echo "# TODO: Install, build, deploy in both apps"
+            cd udagram-api
+            sed -i 's/"node": "14\.15\.0"/"node": "20.x"/' package.json
+            cat package.json | grep -A2 "engines"
+      
+      # Deploy Frontend to S3
+      - run:
+          name: Deploy Frontend to S3
+          command: |
+            echo "🚀 Deploying Frontend to S3..."
+            cd udagram-frontend
             
+            # Install and build
+            npm install
+            npm run build
+            
+            # Deploy to S3
+            aws s3 sync ./www s3://udagram-frontend-amribrahem-06122025/ \
+              --acl public-read \
+              --delete \
+              --cache-control "max-age=31536000"
+            
+            # Special cache headers for index.html
+            aws s3 cp ./www/index.html s3://udagram-frontend-amribrahem-06122025/index.html \
+              --metadata-directive REPLACE \
+              --cache-control "max-age=0,no-cache,no-store,must-revalidate" \
+              --acl public-read
+            
+            echo "✅ Frontend deployed to S3"
+            echo "🔗 URL: http://udagram-frontend-amribrahem-06122025.s3-website-us-east-1.amazonaws.com"
+      
+      # Deploy Backend to Elastic Beanstalk
+      - run:
+          name: Deploy Backend to Elastic Beanstalk
+          command: |
+            echo "🚀 Deploying Backend to Elastic Beanstalk..."
+            cd udagram-api
+            
+            # Install dependencies
+            npm install
+            
+            # Build the application
+            npm run build
+            
+            # Deploy using EB CLI
+            # The .elasticbeanstalk/config.yml is already configured correctly
+            eb deploy udagram-api-dev --verbose --timeout 30
+            
+            echo "✅ Backend deployed to Elastic Beanstalk"
+            echo "🔗 API URL: http://udagram-api-dev.eba-cpkizpuh.us-east-1.elasticbeanstalk.com"
+      
+      # Verify deployments
+      - run:
+          name: Verify All Deployments
+          command: |
+            echo "=== 📋 Deployment Verification ==="
+            echo ""
+            echo "1. ✅ S3 Frontend:"
+            aws s3 ls s3://udagram-frontend-amribrahem-06122025/ --recursive --human-readable | head -5
+            echo ""
+            echo "2. ✅ Elastic Beanstalk Status:"
+            aws elasticbeanstalk describe-environments \
+              --environment-names "udagram-api-dev" \
+              --query "Environments[0].[EnvironmentName, Status, Health, VersionLabel]" \
+              --output table
+            echo ""
+            echo "3. ✅ API Test:"
+            curl -s -f http://udagram-api-dev.eba-cpkizpuh.us-east-1.elasticbeanstalk.com/api/v0/feed \
+              && echo "API is working!" \
+              || echo "API test failed"
+
 workflows:
-  udagram:
+  udagram-deployment:
     jobs:
       - build
+      
       - hold:
-          filters:
-            branches:
-              only:
-                - master
           type: approval
           requires:
             - build
+          filters:
+            branches:
+              only: master
+      
       - deploy:
           requires:
             - hold
+          filters:
+            branches:
+              only: master
