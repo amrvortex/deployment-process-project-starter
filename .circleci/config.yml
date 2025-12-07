@@ -85,7 +85,7 @@ jobs:
             
             if [ -n "$AWS_SESSION_TOKEN" ]; then
               echo "Configuring with session token (AWS Academy/temporary credentials)..."
-              cat > ~/.aws/credentials << EOF
+              cat > ~/.aws/credentials \<< EOF
             [default]
             aws_access_key_id = ${AWS_ACCESS_KEY_ID}
             aws_secret_access_key = ${AWS_SECRET_ACCESS_KEY}
@@ -93,14 +93,14 @@ jobs:
             EOF
             else
               echo "Configuring with permanent credentials..."
-              cat > ~/.aws/credentials << EOF
+              cat > ~/.aws/credentials \<< EOF
             [default]
             aws_access_key_id = ${AWS_ACCESS_KEY_ID}
             aws_secret_access_key = ${AWS_SECRET_ACCESS_KEY}
             EOF
             fi
             
-            cat > ~/.aws/config << EOF
+            cat > ~/.aws/config \<< EOF
             [default]
             region = ${AWS_DEFAULT_REGION:-us-east-1}
             output = json
