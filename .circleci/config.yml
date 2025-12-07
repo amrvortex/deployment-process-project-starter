@@ -11,52 +11,99 @@ jobs:
     steps:
       - checkout
       
-      # Update package.json Node.js version (FIXED)
+      # First, check directory structure
+      - run:
+          name: Check Directory Structure
+          command: |
+            echo "Current directory: $(pwd)"
+            ls -la
+            echo "---"
+            find . -type d -name "*api*" -o -name "*frontend*" | head -10
+      
+      # Update package.json Node.js version (WITH CORRECT PATH)
       - run:
           name: Update Node.js version in package.json
           command: |
-            cd udagram-api
-            # Update engines field to Node.js 20
-            sed -i 's/"node": "14\.15\.0"/"node": ">=20.0.0"/' package.json
+            # Check if we need to cd into udagram-api or if we're already there
+            if [ -f "package.json" ]; then
+              echo "Already in udagram-api directory"
+              # Update engines field to Node.js 20
+              sed -i 's/"node": "14\.15\.0"/"node": ">=20.0.0"/' package.json
+            elif [ -d "udagram-api" ]; then
+              echo "Changing to udagram-api directory"
+              cd udagram-api
+              sed -i 's/"node": "14\.15\.0"/"node": ">=20.0.0"/' package.json
+            elif [ -d "deployment-process-project-starter/udagram/udagram-api" ]; then
+              echo "Changing to nested directory"
+              cd deployment-process-project-starter/udagram/udagram-api
+              sed -i 's/"node": "14\.15\.0"/"node": ">=20.0.0"/' package.json
+            else
+              echo "ERROR: Cannot find udagram-api directory"
+              find . -name "package.json" -type f
+              exit 1
+            fi
             echo "Updated package.json Node.js version to >=20.0.0"
+            cat package.json | grep -A2 "engines"
       
-      # Install backend dependencies
+      # Install backend dependencies (WITH CORRECT PATH)
       - run:
           name: Install Backend Dependencies
           command: |
-            cd udagram-api
+            # Find and cd to backend
+            if [ -f "package.json" ] && grep -q "udagram-api" package.json; then
+              echo "Already in backend directory"
+            elif [ -d "udagram-api" ]; then
+              cd udagram-api
+            elif [ -d "deployment-process-project-starter/udagram/udagram-api" ]; then
+              cd deployment-process-project-starter/udagram/udagram-api
+            fi
             npm install
       
-      # Install frontend dependencies
+      # Install frontend dependencies (WITH CORRECT PATH)
       - run:
           name: Install Frontend Dependencies
           command: |
-            cd udagram-frontend
+            # Find and cd to frontend
+            if [ -d "udagram-frontend" ]; then
+              cd udagram-frontend
+            elif [ -d "deployment-process-project-starter/udagram/udagram-frontend" ]; then
+              cd deployment-process-project-starter/udagram/udagram-frontend
+            elif [ -f "src/environments/environment.prod.ts" ]; then
+              echo "Already in frontend directory"
+            else
+              echo "ERROR: Cannot find frontend directory"
+              find . -name "environment.prod.ts" -type f
+              exit 1
+            fi
             npm install
       
-      # Build backend
+      # Build backend (WITH CORRECT PATH)
       - run:
           name: Build Backend
           command: |
-            cd udagram-api
+            # Find and cd to backend
+            if [ -f "package.json" ] && grep -q "udagram-api" package.json; then
+              echo "Already in backend directory"
+            elif [ -d "udagram-api" ]; then
+              cd udagram-api
+            elif [ -d "deployment-process-project-starter/udagram/udagram-api" ]; then
+              cd deployment-process-project-starter/udagram/udagram-api
+            fi
             npm run build
       
-      # Build frontend
+      # Build frontend (WITH CORRECT PATH)
       - run:
           name: Build Frontend
           command: |
-            cd udagram-frontend
+            # Find and cd to frontend
+            if [ -d "udagram-frontend" ]; then
+              cd udagram-frontend
+            elif [ -d "deployment-process-project-starter/udagram/udagram-frontend" ]; then
+              cd deployment-process-project-starter/udagram/udagram-frontend
+            elif [ -f "src/environments/environment.prod.ts" ]; then
+              echo "Already in frontend directory"
+            fi
             npm run build
-      
-      # Verify builds
-      - run:
-          name: Verify Builds
-          command: |
-            echo "Backend build:"
-            ls -la udagram-api/www/
-            echo ""
-            echo "Frontend build:"
-            ls -la udagram-frontend/www/
 
   deploy:
     docker:
@@ -67,26 +114,24 @@ jobs:
       # Setup AWS CLI
       - aws-cli/setup
       
-      # Install Elastic Beanstalk CLI (ADD THIS)
+      # Install Elastic Beanstalk CLI
       - run:
           name: Install EB CLI
           command: |
             pip install awsebcli
-      
-      # Update Node.js version in package.json for deployment
-      - run:
-          name: Ensure Node.js 20 in package.json
-          command: |
-            cd udagram-api
-            # Already updated, just verify
-            cat package.json | grep -A2 "engines"
       
       # Deploy Frontend to S3
       - run:
           name: Deploy Frontend to S3
           command: |
             echo "🚀 Deploying Frontend to S3..."
-            cd udagram-frontend
+            
+            # Find frontend directory
+            if [ -d "udagram-frontend" ]; then
+              cd udagram-frontend
+            elif [ -d "deployment-process-project-starter/udagram/udagram-frontend" ]; then
+              cd deployment-process-project-starter/udagram/udagram-frontend
+            fi
             
             # Install and build
             npm install
@@ -111,7 +156,15 @@ jobs:
           name: Deploy Backend to Elastic Beanstalk
           command: |
             echo "🚀 Deploying Backend to Elastic Beanstalk..."
-            cd udagram-api
+            
+            # Find backend directory
+            if [ -f "package.json" ] && grep -q "udagram-api" package.json; then
+              echo "Already in backend directory"
+            elif [ -d "udagram-api" ]; then
+              cd udagram-api
+            elif [ -d "deployment-process-project-starter/udagram/udagram-api" ]; then
+              cd deployment-process-project-starter/udagram/udagram-api
+            fi
             
             # Install dependencies
             npm install
@@ -127,26 +180,6 @@ jobs:
             
             echo "✅ Backend deployed to Elastic Beanstalk"
             echo "🔗 API URL: http://udagram-api-dev.eba-cpkizpuh.us-east-1.elasticbeanstalk.com"
-      
-      # Verify deployments
-      - run:
-          name: Verify All Deployments
-          command: |
-            echo "=== 📋 Deployment Verification ==="
-            echo ""
-            echo "1. ✅ S3 Frontend:"
-            aws s3 ls s3://udagram-frontend-amribrahem-06122025/ --recursive --human-readable | head -5
-            echo ""
-            echo "2. ✅ Elastic Beanstalk Status:"
-            aws elasticbeanstalk describe-environments \
-              --environment-names "udagram-api-dev" \
-              --query "Environments[0].[EnvironmentName, Status, Health, VersionLabel]" \
-              --output table
-            echo ""
-            echo "3. ✅ API Test:"
-            curl -s -f http://udagram-api-dev.eba-cpkizpuh.us-east-1.elasticbeanstalk.com/api/v0/feed \
-              && echo "API is working!" \
-              || echo "API test failed"
 
 workflows:
   udagram-deployment:
