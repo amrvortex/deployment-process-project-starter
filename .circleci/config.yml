@@ -41,6 +41,7 @@ jobs:
       - run:
           name: Build Backend
           command: |
+            sudo apt-get update && sudo apt-get install -y zip
             cd udagram/udagram-api
             npm run build
 
@@ -89,6 +90,7 @@ jobs:
       - run:
           name: Deploy Backend to Elastic Beanstalk
           command: |
+            sudo apt-get update && sudo apt-get install -y zip
             cd udagram/udagram-api
             npm install
             npm run build
