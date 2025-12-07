@@ -58,7 +58,58 @@ jobs:
     steps:
       - checkout
 
-      - aws-cli/setup
+      - run:
+          name: Debug AWS Credentials
+          command: |
+            chmod +x .circleci/debug-aws.sh
+            .circleci/debug-aws.sh
+
+      - run:
+          name: Configure AWS CLI Manually
+          command: |
+            # Install AWS CLI if not present
+            if ! command -v aws &> /dev/null; then
+              echo "Installing AWS CLI..."
+              curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+              unzip awscliv2.zip
+              sudo ./aws/install
+            fi
+            
+            # Configure AWS credentials manually
+            mkdir -p ~/.aws
+            
+            # Check if session token is provided (for AWS Academy/temporary credentials)
+            if [ -n "$AWS_SESSION_TOKEN" ]; then
+              echo "Configuring with session token (temporary credentials)..."
+              cat > ~/.aws/credentials << EOF
+[default]
+aws_access_key_id = ${AWS_ACCESS_KEY_ID}
+aws_secret_access_key = ${AWS_SECRET_ACCESS_KEY}
+aws_session_token = ${AWS_SESSION_TOKEN}
+EOF
+            else
+              echo "Configuring with permanent credentials..."
+              cat > ~/.aws/credentials << EOF
+[default]
+aws_access_key_id = ${AWS_ACCESS_KEY_ID}
+aws_secret_access_key = ${AWS_SECRET_ACCESS_KEY}
+EOF
+            fi
+            
+            cat > ~/.aws/config << EOF
+[default]
+region = ${AWS_DEFAULT_REGION:-us-east-1}
+output = json
+EOF
+            
+            echo "✓ AWS CLI configured manually"
+            
+      - run:
+          name: Verify AWS Configuration
+          command: |
+            echo "Testing AWS connection..."
+            aws sts get-caller-identity
+            echo "✓ AWS authentication successful"
 
       - run:
           name: Install EB CLI
