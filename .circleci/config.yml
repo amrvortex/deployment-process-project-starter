@@ -36,7 +36,7 @@ jobs:
           name: Install Frontend Dependencies
           command: |
             cd udagram/udagram-frontend
-            npm install
+            npm install --legacy-peer-deps
 
       - run:
           name: Build Backend
@@ -68,7 +68,7 @@ jobs:
           name: Deploy Frontend to S3
           command: |
             cd udagram/udagram-frontend
-            npm install
+            npm install --legacy-peer-deps
             export NODE_OPTIONS=--openssl-legacy-provider
             npm run build
             
