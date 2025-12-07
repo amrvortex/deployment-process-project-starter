@@ -241,7 +241,7 @@ If I had more time, I'd add:
 
 ## Credits
 
-This project was completed as part of the Udacity Cloud DevOps Engineer Nanodegree. Thanks to Udacity for the starter code and project structure, and to the AWS and CircleCI documentation which I referenced constantly while building this.
+This project was completed as part of the Udacity Fullstack Javascript Nanodegree. Thanks to Udacity for the starter code and project structure, and to the AWS and CircleCI documentation which I referenced constantly while building this.
 
 ## License
 
