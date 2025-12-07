@@ -7,18 +7,18 @@ orbs:
 jobs:
   build:
     docker:
-      - image: cimg/node:20.0  # MUST match your EB: Node.js 20
+      - image: cimg/node:20.0
     steps:
       - checkout
       
-      # Update package.json Node.js version if needed (optional)
+      # Update package.json Node.js version (FIXED)
       - run:
           name: Update Node.js version in package.json
           command: |
             cd udagram-api
             # Update engines field to Node.js 20
-            sed -i 's/"node": "14\.15\.0"/"node": "20.x"/' package.json
-            echo "Updated package.json Node.js version to 20.x"
+            sed -i 's/"node": "14\.15\.0"/"node": ">=20.0.0"/' package.json
+            echo "Updated package.json Node.js version to >=20.0.0"
       
       # Install backend dependencies
       - run:
@@ -60,19 +60,25 @@ jobs:
 
   deploy:
     docker:
-      - image: cimg/node:20.0  # MUST match your EB: Node.js 20
+      - image: cimg/node:20.0
     steps:
       - checkout
       
       # Setup AWS CLI
       - aws-cli/setup
       
+      # Install Elastic Beanstalk CLI (ADD THIS)
+      - run:
+          name: Install EB CLI
+          command: |
+            pip install awsebcli
+      
       # Update Node.js version in package.json for deployment
       - run:
           name: Ensure Node.js 20 in package.json
           command: |
             cd udagram-api
-            sed -i 's/"node": "14\.15\.0"/"node": "20.x"/' package.json
+            # Already updated, just verify
             cat package.json | grep -A2 "engines"
       
       # Deploy Frontend to S3
@@ -89,8 +95,7 @@ jobs:
             # Deploy to S3
             aws s3 sync ./www s3://udagram-frontend-amribrahem-06122025/ \
               --acl public-read \
-              --delete \
-              --cache-control "max-age=31536000"
+              --delete
             
             # Special cache headers for index.html
             aws s3 cp ./www/index.html s3://udagram-frontend-amribrahem-06122025/index.html \
@@ -114,8 +119,10 @@ jobs:
             # Build the application
             npm run build
             
-            # Deploy using EB CLI
-            # The .elasticbeanstalk/config.yml is already configured correctly
+            # Initialize EB (use existing config)
+            eb init udagram-api --platform node.js --region us-east-1 --verbose
+            
+            # Deploy to existing environment
             eb deploy udagram-api-dev --verbose --timeout 30
             
             echo "✅ Backend deployed to Elastic Beanstalk"
