@@ -89,12 +89,6 @@ jobs:
             npm run build
             eb init udagram-api --platform "Node.js 20" --region us-east-1
             eb use udagram-api-dev
-            eb deploy udagram-api-dev --timeout 30  # DEPLOY FIRST
-
-      - run:
-          name: Set Environment Variables in Elastic Beanstalk
-          command: |
-            cd udagram/udagram-api
             eb setenv \
               POSTGRES_USERNAME="$POSTGRES_USERNAME" \
               POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
@@ -103,6 +97,7 @@ jobs:
               AWS_BUCKET="$AWS_BUCKET" \
               AWS_REGION="$AWS_REGION" \
               JWT_SECRET="$JWT_SECRET"
+            eb deploy udagram-api-dev --timeout 30
 
 workflows:
   udagram-deployment:
